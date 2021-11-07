@@ -1,0 +1,4 @@
+cbor2==5.4.2
+ecdsa==0.17.0
+jwcrypto==1.0
+requests==2.26.0
