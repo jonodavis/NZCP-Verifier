@@ -1,5 +1,5 @@
 # NZ COVID Pass Verifier 
-This is an API which verifies whether a NZ COVID Pass is valid or not. 
+This is an API which verifies whether an NZ COVID Pass is valid or not. 
 ## Steps to run the API locally
 1. Create a new virtual environment:
 ```
@@ -19,7 +19,7 @@ python api.py
 ```
 The API will now be listening for POST requests at http://localhost:5000/verify on port 5000.
 
-## Sending a NZCP to the API for verification
+## Sending an NZCP to the API for verification
 The API accepts HTTP POST requests only. The only required header is `Content-Type: application/json`. The body of the request should be a JSON object with the following fields:
 ```json
 {
