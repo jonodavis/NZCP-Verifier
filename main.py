@@ -236,7 +236,7 @@ def check_code(code_to_check):
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     for k, v in codes.items():
-        print(k, "VALID" if check_code(v) else "INVALID") 
+        print(k + ":", "VALID" if check_code(v) else "INVALID") 
         print("----------------------------------------------------")
         
 
