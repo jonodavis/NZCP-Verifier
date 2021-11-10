@@ -1,2 +1,3 @@
 venv/
 todo
+__pycache__/
