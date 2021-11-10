@@ -5,9 +5,12 @@ api = Flask(__name__)
 
 @api.route('/verify', methods=['POST'])
 def verify():
-  req = request.get_json()
-  res = verifier.check_code(req["payload"])
-  return res
+  try:
+    req = request.get_json()
+    res = verifier.check_code(req["payload"])
+    return res
+  except:
+    return "Error"
 
 if __name__ == '__main__':
   api.run()
