@@ -10,7 +10,7 @@ def verify():
     res = verifier.check_code(req["payload"])
     return res
   except:
-    return "Error"
+    return {"validated": False} 
 
 if __name__ == '__main__':
   api.run()

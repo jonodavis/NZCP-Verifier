@@ -196,10 +196,7 @@ def construct_response(validated, decoded_CWT_payload=None, uuid=None):
 
 def check_code(code_to_check):
     try:
-        padded = addBase32Padding(code_to_check)
-        # logging.info(padded)
-
-        base32_input_without_prefix = check_and_remove_prefix(padded)
+        base32_input_without_prefix = check_and_remove_prefix(code_to_check)
         if not base32_input_without_prefix:
             return construct_response(False) 
         # logging.info(base32_input_without_prefix)
@@ -209,7 +206,10 @@ def check_code(code_to_check):
             return construct_response(False) 
         # logging.info(base32_input)
 
-        decoded = decode_base32(base32_input)
+        padded = addBase32Padding(base32_input)
+        # logging.info(padded)
+
+        decoded = decode_base32(padded)
         if not decoded:
             return construct_response(False) 
         # logging.info(decoded.hex())
