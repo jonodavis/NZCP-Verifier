@@ -1,9 +1,9 @@
 import verifier
-from flask import Flask, request, jsonify
+from flask import Flask, app, request, jsonify
 
-api = Flask(__name__)
+application = Flask(__name__)
 
-@api.route('/verify', methods=['POST'])
+@application.route('/verify', methods=['POST'])
 def verify():
   try:
     req = request.get_json()
@@ -16,4 +16,4 @@ def verify():
     return {"validated": False} 
 
 if __name__ == '__main__':
-  api.run()
+  application.run()
