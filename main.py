@@ -8,7 +8,7 @@ from cbor2 import dumps, loads
 from jwcrypto import jwk
 from ecdsa import VerifyingKey, BadSignatureError
 
-codes = {
+TEST_CODES = {
     "VALID_CODE" : "NZCP:/1/2KCEVIQEIVVWK6JNGEASNICZAEP2KALYDZSGSZB2O5SWEOTOPJRXALTDN53GSZBRHEXGQZLBNR2GQLTOPICRUYMBTIFAIGTUKBAAUYTWMOSGQQDDN5XHIZLYOSBHQJTIOR2HA4Z2F4XXO53XFZ3TGLTPOJTS6MRQGE4C6Y3SMVSGK3TUNFQWY4ZPOYYXQKTIOR2HA4Z2F4XW46TDOAXGG33WNFSDCOJONBSWC3DUNAXG46RPMNXW45DFPB2HGL3WGFTXMZLSONUW63TFGEXDALRQMR2HS4DFQJ2FMZLSNFTGSYLCNRSUG4TFMRSW45DJMFWG6UDVMJWGSY2DN53GSZCQMFZXG4LDOJSWIZLOORUWC3CTOVRGUZLDOSRWSZ3JOZSW4TTBNVSWISTBMNVWUZTBNVUWY6KOMFWWKZ2TOBQXE4TPO5RWI33CNIYTSNRQFUYDILJRGYDVAYFE6VGU4MCDGK7DHLLYWHVPUS2YIDJOA6Y524TD3AZRM263WTY2BE4DPKIF27WKF3UDNNVSVWRDYIYVJ65IRJJJ6Z25M2DO4YZLBHWFQGVQR5ZLIWEQJOZTS3IQ7JTNCFDX",
 
     "BAD_PUBLIC_KEY" : "NZCP:/1/2KCEVIQEIVVWK6JNGEASNICZAEP2KALYDZSGSZB2O5SWEOTOPJRXALTDN53GSZBRHEXGQZLBNR2GQLTOPICRUYMBTIFAIGTUKBAAUYTWMOSGQQDDN5XHIZLYOSBHQJTIOR2HA4Z2F4XXO53XFZ3TGLTPOJTS6MRQGE4C6Y3SMVSGK3TUNFQWY4ZPOYYXQKTIOR2HA4Z2F4XW46TDOAXGG33WNFSDCOJONBSWC3DUNAXG46RPMNXW45DFPB2HGL3WGFTXMZLSONUW63TFGEXDALRQMR2HS4DFQJ2FMZLSNFTGSYLCNRSUG4TFMRSW45DJMFWG6UDVMJWGSY2DN53GSZCQMFZXG4LDOJSWIZLOORUWC3CTOVRGUZLDOSRWSZ3JOZSW4TTBNVSWISTBMNVWUZTBNVUWY6KOMFWWKZ2TOBQXE4TPO5RWI33CNIYTSNRQFUYDILJRGYDVAY73U6TCQ3KF5KFML5LRCS5D3PCYIB2D3EOIIZRPXPUA2OR3NIYCBMGYRZUMBNBDMIA5BUOZKVOMSVFS246AMU7ADZXWBYP7N4QSKNQ4TETIF4VIRGLHOXWYMR4HGQ7KYHHU",
@@ -163,7 +163,25 @@ def validate_signature(signature, pem_key, message):
     except BadSignatureError:
         logging.info("Validating digital signature: FAIL")
         return False
-    
+
+
+def construct_response(validated, decoded_CWT_payload=None):
+    res = {}
+    if validated:
+        res["validated"] = validated
+        res["payload"] = decoded_CWT_payload["vc"]["credentialSubject"]
+        res["metadata"] = {}
+        res["metadata"]["expiry"] = datetime.utcfromtimestamp(decoded_CWT_payload[4]).isoformat()
+        res["metadata"]["notBefore"] = datetime.utcfromtimestamp(decoded_CWT_payload[5]).isoformat()
+        res["metadata"]["id"] = decoded_CWT_payload[7].hex()
+        res["metadata"]["issuer"] = decoded_CWT_payload[1]
+        res["metadata"]["type"] = decoded_CWT_payload["vc"]["type"][1]
+        return res
+    else:
+        res["validated"] = validated
+        return res
+
+
 
 def check_code(code_to_check):
     padded = addBase32Padding(code_to_check)
@@ -171,51 +189,51 @@ def check_code(code_to_check):
 
     base32_input_without_prefix = check_and_remove_prefix(padded)
     if not base32_input_without_prefix:
-        return False
+        return construct_response(False) 
     # logging.info(base32_input_without_prefix)
 
     base32_input = check_and_remove_version(base32_input_without_prefix)
     if not base32_input:
-        return False
+        return construct_response(False) 
     # logging.info(base32_input)
 
     decoded = decode_base32(base32_input)
     if not decoded:
-        return False
+        return construct_response(False) 
     # logging.info(decoded.hex())
 
     decoded_COSE_structure = decode_cbor(decoded).value
     if not decoded_COSE_structure:
-        return False
+        return construct_response(False) 
     # logging.info(decoded_COSE_structure)
 
     decoded_CWT_protected_headers = decode_cbor(decoded_COSE_structure[0])
     if not decoded_CWT_protected_headers:
-        return False
+        return construct_response(False) 
     # logging.info(decoded_CWT_protected_headers)
 
     decoded_CWT_payload = decode_cbor(decoded_COSE_structure[2])
     if not decoded_CWT_payload:
-        return False
+        return construct_response(False) 
     # logging.info(decoded_CWT_payload)
 
     if not check_cwt_claims(decoded_CWT_payload):
-        return False
+        return construct_response(False) 
 
     did_json = get_DID_from_issuer(decoded_CWT_payload[1])
     if not did_json:
-        return False
+        return construct_response(False) 
     # logging.info(did_json)
 
     if not validate_DID(decoded_CWT_payload[1], decoded_CWT_protected_headers, did_json):
-        return False 
+        return construct_response(False) 
 
     signature = decoded_COSE_structure[3]
     # logging.info(signature)
 
     issuer_public_key = get_issuer_public_key_from_did(did_json)
     if not issuer_public_key:
-        return False
+        return construct_response(False) 
     # logging.info(issuer_public_key)
 
     pem_key = convert_jwk_to_pem(issuer_public_key)
@@ -228,17 +246,34 @@ def check_code(code_to_check):
 
     validated = validate_signature(signature, pem_key, to_be_signed)
     if not validated:
-        return False
+        return construct_response(False) 
 
-    return True 
+    return construct_response(validated, decoded_CWT_payload)
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    for k, v in codes.items():
-        print(k + ":", "VALID" if check_code(v) else "INVALID") 
-        print("----------------------------------------------------")
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+    for k, v in TEST_CODES.items():
+        print(k + ":", check_code(v))
+        logging.info("----------------------------------------------------")
         
 
 if __name__=="__main__":
     main()
+
+# return value of check_code shoud become this:
+# {
+#   "verified": true,
+#   "payload": {
+#       "givenName": "Samantha",
+#       "familyName": "Gill",
+#       "dob": "1984-08-07"
+#   },
+#   "metadata": {
+#     "expiry": "2022-02-20T12:34:56.000Z",
+#     "notBefore": "2020-01-20T12:34:56.000Z",
+#     "id": "urn:uuid:850a1de1-f890-4be5-b105-d721e5f3bc98",
+#     "issuer": "did:web:example.com",
+#     "type": "PublicCovidPass"
+#   }
+# }
