@@ -15,7 +15,7 @@ pip install -r requirements.txt
 ```
 4. Start API:
 ```
-python api.py
+python application.py
 ```
 The API will now be listening for POST requests at http://localhost:5000/verify on port 5000.
 

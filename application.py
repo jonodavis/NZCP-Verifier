@@ -1,5 +1,5 @@
 import verifier
-from flask import Flask, app, request, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 application = Flask(__name__)
