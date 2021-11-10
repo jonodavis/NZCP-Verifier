@@ -12,7 +12,7 @@ source ./venv/bin/activate
 ```
 pip install -r requirements.txt
 ```
-4. Run script:
+4. Start API:
 ```
-python main.py
+python api.py
 ```

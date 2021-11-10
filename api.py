@@ -8,3 +8,6 @@ def verify():
   req = request.get_json()
   res = verifier.check_code(req["payload"])
   return res
+
+if __name__ == '__main__':
+  api.run()
