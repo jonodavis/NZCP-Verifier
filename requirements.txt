@@ -1,5 +1,6 @@
 cbor2==5.4.2
 ecdsa==0.17.0
 Flask==2.0.2
+Flask_Cors==3.0.10
 jwcrypto==1.0
 requests==2.26.0
