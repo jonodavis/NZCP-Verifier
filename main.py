@@ -99,6 +99,17 @@ def check_cwt_claims(decoded_payload):
 
     return True
 
+def decode_UUID(encoded_UUID):
+    try:
+        result = encoded_UUID.hex()
+        result = result[0:8] + "-" + result[8:12] + "-" + result[12:16] + "-" + result[16:20] + "-" + result[20:32]
+        result = "urn:uuid:" + result
+        logging.info("Decoding UUID: PASS")
+        return result
+    except:
+        logging.info("Decoding UUID: FAIL")
+        return False
+
 
 def get_DID_from_issuer(iss):
     try:
@@ -165,7 +176,7 @@ def validate_signature(signature, pem_key, message):
         return False
 
 
-def construct_response(validated, decoded_CWT_payload=None):
+def construct_response(validated, decoded_CWT_payload=None, uuid=None):
     res = {}
     if validated:
         res["validated"] = validated
@@ -173,7 +184,7 @@ def construct_response(validated, decoded_CWT_payload=None):
         res["metadata"] = {}
         res["metadata"]["expiry"] = datetime.utcfromtimestamp(decoded_CWT_payload[4]).isoformat()
         res["metadata"]["notBefore"] = datetime.utcfromtimestamp(decoded_CWT_payload[5]).isoformat()
-        res["metadata"]["id"] = decoded_CWT_payload[7].hex()
+        res["metadata"]["id"] = uuid
         res["metadata"]["issuer"] = decoded_CWT_payload[1]
         res["metadata"]["type"] = decoded_CWT_payload["vc"]["type"][1]
         return res
@@ -220,6 +231,10 @@ def check_code(code_to_check):
     if not check_cwt_claims(decoded_CWT_payload):
         return construct_response(False) 
 
+    decoded_UUID = decode_UUID(decoded_CWT_payload[7])
+    if not decoded_UUID:
+        return construct_response(False)
+
     did_json = get_DID_from_issuer(decoded_CWT_payload[1])
     if not did_json:
         return construct_response(False) 
@@ -248,7 +263,7 @@ def check_code(code_to_check):
     if not validated:
         return construct_response(False) 
 
-    return construct_response(validated, decoded_CWT_payload)
+    return construct_response(validated, decoded_CWT_payload, decoded_UUID)
 
 
 def main():
