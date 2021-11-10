@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ```
 python api.py
 ```
-The API will now be listening for POST requests at http://localhost/verify on port 5000.
+The API will now be listening for POST requests at http://localhost:5000/verify on port 5000.
 
 ## Sending a NZCP to the API for verification
 The API accepts HTTP POST requests only. The only required header is `Content-Type: application/json`. The body of the request should be a JSON object with the following fields:
