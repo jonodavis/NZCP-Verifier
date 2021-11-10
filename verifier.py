@@ -195,75 +195,79 @@ def construct_response(validated, decoded_CWT_payload=None, uuid=None):
 
 
 def check_code(code_to_check):
-    padded = addBase32Padding(code_to_check)
-    # logging.info(padded)
+    try:
+        padded = addBase32Padding(code_to_check)
+        # logging.info(padded)
 
-    base32_input_without_prefix = check_and_remove_prefix(padded)
-    if not base32_input_without_prefix:
-        return construct_response(False) 
-    # logging.info(base32_input_without_prefix)
+        base32_input_without_prefix = check_and_remove_prefix(padded)
+        if not base32_input_without_prefix:
+            return construct_response(False) 
+        # logging.info(base32_input_without_prefix)
 
-    base32_input = check_and_remove_version(base32_input_without_prefix)
-    if not base32_input:
-        return construct_response(False) 
-    # logging.info(base32_input)
+        base32_input = check_and_remove_version(base32_input_without_prefix)
+        if not base32_input:
+            return construct_response(False) 
+        # logging.info(base32_input)
 
-    decoded = decode_base32(base32_input)
-    if not decoded:
-        return construct_response(False) 
-    # logging.info(decoded.hex())
+        decoded = decode_base32(base32_input)
+        if not decoded:
+            return construct_response(False) 
+        # logging.info(decoded.hex())
 
-    decoded_COSE_structure = decode_cbor(decoded).value
-    if not decoded_COSE_structure:
-        return construct_response(False) 
-    # logging.info(decoded_COSE_structure)
+        decoded_COSE_structure = decode_cbor(decoded).value
+        if not decoded_COSE_structure:
+            return construct_response(False) 
+        # logging.info(decoded_COSE_structure)
 
-    decoded_CWT_protected_headers = decode_cbor(decoded_COSE_structure[0])
-    if not decoded_CWT_protected_headers:
-        return construct_response(False) 
-    # logging.info(decoded_CWT_protected_headers)
+        decoded_CWT_protected_headers = decode_cbor(decoded_COSE_structure[0])
+        if not decoded_CWT_protected_headers:
+            return construct_response(False) 
+        # logging.info(decoded_CWT_protected_headers)
 
-    decoded_CWT_payload = decode_cbor(decoded_COSE_structure[2])
-    if not decoded_CWT_payload:
-        return construct_response(False) 
-    # logging.info(decoded_CWT_payload)
+        decoded_CWT_payload = decode_cbor(decoded_COSE_structure[2])
+        if not decoded_CWT_payload:
+            return construct_response(False) 
+        # logging.info(decoded_CWT_payload)
 
-    if not check_cwt_claims(decoded_CWT_payload):
-        return construct_response(False) 
+        if not check_cwt_claims(decoded_CWT_payload):
+            return construct_response(False) 
 
-    decoded_UUID = decode_UUID(decoded_CWT_payload[7])
-    if not decoded_UUID:
+        decoded_UUID = decode_UUID(decoded_CWT_payload[7])
+        if not decoded_UUID:
+            return construct_response(False)
+
+        did_json = get_DID_from_issuer(decoded_CWT_payload[1])
+        if not did_json:
+            return construct_response(False) 
+        # logging.info(did_json)
+
+        if not validate_DID(decoded_CWT_payload[1], decoded_CWT_protected_headers, did_json):
+            return construct_response(False) 
+
+        signature = decoded_COSE_structure[3]
+        # logging.info(signature)
+
+        issuer_public_key = get_issuer_public_key_from_did(did_json)
+        if not issuer_public_key:
+            return construct_response(False) 
+        # logging.info(issuer_public_key)
+
+        pem_key = convert_jwk_to_pem(issuer_public_key)
+        # logging.info(pem_key)
+
+        to_be_signed = generate_sig_structure(decoded_COSE_structure[0], decoded_COSE_structure[2])
+        if not to_be_signed:
+            return False
+        # logging.info(to_be_signed)
+
+        validated = validate_signature(signature, pem_key, to_be_signed)
+        if not validated:
+            return construct_response(False) 
+
+        return construct_response(validated, decoded_CWT_payload, decoded_UUID)
+
+    except:
         return construct_response(False)
-
-    did_json = get_DID_from_issuer(decoded_CWT_payload[1])
-    if not did_json:
-        return construct_response(False) 
-    # logging.info(did_json)
-
-    if not validate_DID(decoded_CWT_payload[1], decoded_CWT_protected_headers, did_json):
-        return construct_response(False) 
-
-    signature = decoded_COSE_structure[3]
-    # logging.info(signature)
-
-    issuer_public_key = get_issuer_public_key_from_did(did_json)
-    if not issuer_public_key:
-        return construct_response(False) 
-    # logging.info(issuer_public_key)
-
-    pem_key = convert_jwk_to_pem(issuer_public_key)
-    # logging.info(pem_key)
-
-    to_be_signed = generate_sig_structure(decoded_COSE_structure[0], decoded_COSE_structure[2])
-    if not to_be_signed:
-        return False
-    # logging.info(to_be_signed)
-
-    validated = validate_signature(signature, pem_key, to_be_signed)
-    if not validated:
-        return construct_response(False) 
-
-    return construct_response(validated, decoded_CWT_payload, decoded_UUID)
 
 
 def main():
