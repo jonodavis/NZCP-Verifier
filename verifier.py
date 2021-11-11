@@ -8,6 +8,9 @@ from cbor2 import dumps, loads
 from jwcrypto import jwk
 from ecdsa import VerifyingKey, BadSignatureError
 
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 TEST_CODES = {
     "VALID_CODE" : "NZCP:/1/2KCEVIQEIVVWK6JNGEASNICZAEP2KALYDZSGSZB2O5SWEOTOPJRXALTDN53GSZBRHEXGQZLBNR2GQLTOPICRUYMBTIFAIGTUKBAAUYTWMOSGQQDDN5XHIZLYOSBHQJTIOR2HA4Z2F4XXO53XFZ3TGLTPOJTS6MRQGE4C6Y3SMVSGK3TUNFQWY4ZPOYYXQKTIOR2HA4Z2F4XW46TDOAXGG33WNFSDCOJONBSWC3DUNAXG46RPMNXW45DFPB2HGL3WGFTXMZLSONUW63TFGEXDALRQMR2HS4DFQJ2FMZLSNFTGSYLCNRSUG4TFMRSW45DJMFWG6UDVMJWGSY2DN53GSZCQMFZXG4LDOJSWIZLOORUWC3CTOVRGUZLDOSRWSZ3JOZSW4TTBNVSWISTBMNVWUZTBNVUWY6KOMFWWKZ2TOBQXE4TPO5RWI33CNIYTSNRQFUYDILJRGYDVAYFE6VGU4MCDGK7DHLLYWHVPUS2YIDJOA6Y524TD3AZRM263WTY2BE4DPKIF27WKF3UDNNVSVWRDYIYVJ65IRJJJ6Z25M2DO4YZLBHWFQGVQR5ZLIWEQJOZTS3IQ7JTNCFDX",
 
@@ -29,6 +32,8 @@ TRUSTED_ISSUERS = [
     "did:web:nzcp.covid19.health.nz" # for testing only
 ]
 
+stored_dids = {}
+
 
 def addBase32Padding(base32InputNoPadding):
     result = base32InputNoPadding 
@@ -39,63 +44,63 @@ def addBase32Padding(base32InputNoPadding):
 
 def check_and_remove_prefix(padded_base32_input):
     if (padded_base32_input[0:6] == "NZCP:/"):
-        logging.info("Check prefix: PASS")
+        logging.debug("Check prefix: PASS")
         return padded_base32_input[6:]
     else:
-        logging.info("Check prefix: FAIL")
+        logging.debug("Check prefix: FAIL")
         return False 
 
 
 def check_and_remove_version(base32_with_version):
     if (base32_with_version[0] == "1"):
-        logging.info("Checking version number: PASS")
+        logging.debug("Checking version number: PASS")
         return base32_with_version[2:]
     else:
-        logging.info("Checking version number: FAIL")
+        logging.debug("Checking version number: FAIL")
         return False 
 
 
 def decode_base32(base32_input):
     try:
         result = base64.b32decode(base32_input)
-        logging.info("Decoding Base32: PASS")
+        logging.debug("Decoding Base32: PASS")
         return result
     except:
-        logging.info("Decoding Base32: FAIL")
+        logging.debug("Decoding Base32: FAIL")
         return False
 
 
 def decode_cbor(decoded_base32):
     try:
         obj = loads(decoded_base32)
-        logging.info("Decoding CBOR: PASS")
+        logging.debug("Decoding CBOR: PASS")
         return obj
     except:
-        logging.info("Decoing CBOR: FAIL")
+        logging.debug("Decoing CBOR: FAIL")
         return False
 
 
 def check_cwt_claims(decoded_payload):
     for i in [1, 4, 5, 7, 'vc']:
         if i not in decoded_payload:
-            logging.info("Checking CWT headers: FAIL")
+            logging.debug("Checking CWT headers: FAIL")
             return False
     
     if decoded_payload[1] not in TRUSTED_ISSUERS:
-        logging.info("Checking CWT headers: FAIL")
+        logging.debug("Checking CWT headers: FAIL")
         return False
     
-    logging.info("Checking CWT headers: PASS")
+    logging.debug("Checking CWT headers: PASS")
 
     if datetime.now() < datetime.utcfromtimestamp(decoded_payload[5]):
-        logging.info("Checking not before date: FAIL")
+        logging.debug("Checking not before date: FAIL")
         return False
-    logging.info("Checking not before date: PASS")
+    logging.debug("Checking not before date: PASS")
 
     if datetime.now() > datetime.utcfromtimestamp(decoded_payload[4]):
-        logging.info("Checking expiry date: FAIL")
+        logging.debug("Checking expiry date: FAIL")
         return False
-    logging.info("Checking expiry date: PASS")
+    logging.debug("Checking expiry date: PASS")
 
     return True
 
@@ -104,44 +109,45 @@ def decode_UUID(encoded_UUID):
         result = encoded_UUID.hex()
         result = result[0:8] + "-" + result[8:12] + "-" + result[12:16] + "-" + result[16:20] + "-" + result[20:32]
         result = "urn:uuid:" + result
-        logging.info("Decoding UUID: PASS")
+        logging.debug("Decoding UUID: PASS")
         return result
     except:
-        logging.info("Decoding UUID: FAIL")
+        logging.debug("Decoding UUID: FAIL")
         return False
 
 
 def get_DID_from_issuer(iss):
     try:
-        iss = iss.replace("did:web:", "https://")
-        iss += "/.well-known/did.json"
-        did_json = requests.get(iss).json()
-        logging.info("Getting DID from issuer: PASS")
+        url = iss.replace("did:web:", "https://")
+        url += "/.well-known/did.json"
+        did_json = requests.get(url).json()
+        stored_dids[iss] = did_json
+        logging.debug("Getting DID from issuer: PASS")
         return did_json 
     except:
-        logging.info("Getting DID from issuer: FAIL")
+        logging.debug("Getting DID from issuer: FAIL")
         return False
 
 
 def validate_DID(iss, protected_headers, did):
     absolute_key_reference = iss + "#" + protected_headers[4].decode()
     if absolute_key_reference not in did["assertionMethod"]:
-        logging.info("Validating DID: FAIL")
+        logging.debug("Validating DID: FAIL")
         return False
     if did["verificationMethod"][0]["type"] != "JsonWebKey2020":
-        logging.info("Validating DID: FAIL")
+        logging.debug("Validating DID: FAIL")
         return False
-    logging.info("Validating DID: PASS")
+    logging.debug("Validating DID: PASS")
     return True
 
 
 def get_issuer_public_key_from_did(did_json):
     try:
         issuer_publc_key = did_json["verificationMethod"][0]["publicKeyJwk"]
-        logging.info("Extracting public key from issuer DID: PASS")
+        logging.debug("Extracting public key from issuer DID: PASS")
         return issuer_publc_key
     except:
-        logging.info("Extracting public key from issuer DID: FAIL")
+        logging.debug("Extracting public key from issuer DID: FAIL")
         return False
 
 
@@ -158,10 +164,10 @@ def generate_sig_structure(protected_headers, payload):
         sig_structure.append(protected_headers)
         sig_structure.append(b'')
         sig_structure.append(payload)
-        logging.info("Generating Sig_structure: PASS")
+        logging.debug("Generating Sig_structure: PASS")
         return dumps(sig_structure)
     except:
-        logging.info("Generating Sig_structure: FAIL")
+        logging.debug("Generating Sig_structure: FAIL")
         return False
 
 
@@ -169,10 +175,10 @@ def validate_signature(signature, pem_key, message):
     public_key = VerifyingKey.from_pem(pem_key, hashfunc=hashlib.sha256)
     try:
         result = public_key.verify(signature, message, hashfunc=hashlib.sha256)
-        logging.info("Validating digital signature: PASS")
+        logging.debug("Validating digital signature: PASS")
         return result
     except BadSignatureError:
-        logging.info("Validating digital signature: FAIL")
+        logging.debug("Validating digital signature: FAIL")
         return False
 
 
@@ -199,35 +205,35 @@ def check_code(code_to_check):
         base32_input_without_prefix = check_and_remove_prefix(code_to_check)
         if not base32_input_without_prefix:
             return construct_response(False) 
-        # logging.info(base32_input_without_prefix)
+        # logging.debug(base32_input_without_prefix)
 
         base32_input = check_and_remove_version(base32_input_without_prefix)
         if not base32_input:
             return construct_response(False) 
-        # logging.info(base32_input)
+        # logging.debug(base32_input)
 
         padded = addBase32Padding(base32_input)
-        # logging.info(padded)
+        # logging.debug(padded)
 
         decoded = decode_base32(padded)
         if not decoded:
             return construct_response(False) 
-        # logging.info(decoded.hex())
+        # logging.debug(decoded.hex())
 
         decoded_COSE_structure = decode_cbor(decoded).value
         if not decoded_COSE_structure:
             return construct_response(False) 
-        # logging.info(decoded_COSE_structure)
+        # logging.debug(decoded_COSE_structure)
 
         decoded_CWT_protected_headers = decode_cbor(decoded_COSE_structure[0])
         if not decoded_CWT_protected_headers:
             return construct_response(False) 
-        # logging.info(decoded_CWT_protected_headers)
+        # logging.debug(decoded_CWT_protected_headers)
 
         decoded_CWT_payload = decode_cbor(decoded_COSE_structure[2])
         if not decoded_CWT_payload:
             return construct_response(False) 
-        # logging.info(decoded_CWT_payload)
+        # logging.debug(decoded_CWT_payload)
 
         if not check_cwt_claims(decoded_CWT_payload):
             return construct_response(False) 
@@ -236,29 +242,32 @@ def check_code(code_to_check):
         if not decoded_UUID:
             return construct_response(False)
 
-        did_json = get_DID_from_issuer(decoded_CWT_payload[1])
-        if not did_json:
-            return construct_response(False) 
-        # logging.info(did_json)
+        if decoded_CWT_payload[1] in stored_dids:
+            did_json = stored_dids[decoded_CWT_payload[1]]
+        else:
+            did_json = get_DID_from_issuer(decoded_CWT_payload[1])
+            if not did_json:
+                return construct_response(False) 
+        # logging.debug(did_json)
 
         if not validate_DID(decoded_CWT_payload[1], decoded_CWT_protected_headers, did_json):
             return construct_response(False) 
 
         signature = decoded_COSE_structure[3]
-        # logging.info(signature)
+        # logging.debug(signature)
 
         issuer_public_key = get_issuer_public_key_from_did(did_json)
         if not issuer_public_key:
             return construct_response(False) 
-        # logging.info(issuer_public_key)
+        # logging.debug(issuer_public_key)
 
         pem_key = convert_jwk_to_pem(issuer_public_key)
-        # logging.info(pem_key)
+        # logging.debug(pem_key)
 
         to_be_signed = generate_sig_structure(decoded_COSE_structure[0], decoded_COSE_structure[2])
         if not to_be_signed:
             return False
-        # logging.info(to_be_signed)
+        # logging.debug(to_be_signed)
 
         validated = validate_signature(signature, pem_key, to_be_signed)
         if not validated:
@@ -271,10 +280,9 @@ def check_code(code_to_check):
 
 
 def main():
-    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
     for k, v in TEST_CODES.items():
         print(k + ":", check_code(v))
-        logging.info("----------------------------------------------------")
+        logging.debug("----------------------------------------------------")
         
 
 if __name__=="__main__":
