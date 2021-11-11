@@ -7,13 +7,13 @@ CORS(application)
 
 @application.route('/verify', methods=['POST'])
 def verify():
-  try:
-    req = request.get_json()
-    res = jsonify(verifier.check_code(req["payload"]))
-    return res
-  except:
-    res = jsonify({"verified": False})
-    return {"verified": False} 
+    try:
+        req = request.get_json()
+        res = jsonify(verifier.check_code(req["payload"]))
+        return res
+    except:
+        res = jsonify({"verified": False})
+        return {"verified": False} 
 
 if __name__ == '__main__':
-  application.run()
+    application.run()

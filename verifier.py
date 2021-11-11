@@ -35,13 +35,13 @@ TRUSTED_ISSUERS = [
 stored_dids = {}
 
 
-def addBase32Padding(base32InputNoPadding):
+def add_base32_padding(base32_input_no_padding):
     """Return a base32 string with the correct padding
 
     Parameters:
-    base32InputNoPadding (str): base32 string without padding
+    base32_input_no_padding (str): base32 string without padding
     """
-    result = base32InputNoPadding 
+    result = base32_input_no_padding
     while ((len(result) % 8) != 0):
         result += '=' 
     return result
@@ -53,12 +53,16 @@ def check_and_remove_prefix(code):
     Parameters:
     code (str): NZCP code with prefix
     """
-    if (code[0:6] == "NZCP:/"):
-        logging.debug("Check prefix: PASS")
-        return code[6:]
-    else:
+    try:
+        if (code[0:6] == "NZCP:/"):
+            logging.debug("Check prefix: PASS")
+            return code[6:]
+        else:
+            logging.debug("Check prefix: FAIL")
+            return False 
+    except:
         logging.debug("Check prefix: FAIL")
-        return False 
+        return False
 
 
 def check_and_remove_version(base32_with_version):
@@ -67,12 +71,16 @@ def check_and_remove_version(base32_with_version):
     Parameters:
     base32_with_version (str): NZCP code with version and without prefix
     """
-    if (base32_with_version[0] == "1"):
-        logging.debug("Checking version number: PASS")
-        return base32_with_version[2:]
-    else:
+    try:
+        if (base32_with_version[0:2] == "1/"):
+            logging.debug("Checking version number: PASS")
+            return base32_with_version[2:]
+        else:
+            logging.debug("Checking version number: FAIL")
+            return False 
+    except:
         logging.debug("Checking version number: FAIL")
-        return False 
+        return False
 
 
 def decode_base32(base32_input):
@@ -252,12 +260,12 @@ def validate_signature(signature, pem_key, message):
         return False
 
 
-def construct_response(validated, decoded_CWT_payload=None, uuid=None):
+def construct_response(validated, decoded_COSE_payload=None, uuid=None):
     """Returns the correctly formatted response to be sent to the client
 
     Parameters:
     validated (bool): True if the NZCP is valid
-    decoded_CWT_payload (dict): decoded CWT payload (default None)
+    decoded_COSE_payload (dict): decoded COSE payload (default None)
     uuid (str): UUID (default None)
     """
     # EXAMPLE VALIDATED RESPONSE
@@ -279,13 +287,13 @@ def construct_response(validated, decoded_CWT_payload=None, uuid=None):
     res = {}
     if validated:
         res["verified"] = validated
-        res["payload"] = decoded_CWT_payload["vc"]["credentialSubject"]
+        res["payload"] = decoded_COSE_payload["vc"]["credentialSubject"]
         res["metadata"] = {}
-        res["metadata"]["expiry"] = datetime.utcfromtimestamp(decoded_CWT_payload[4]).isoformat()
-        res["metadata"]["notBefore"] = datetime.utcfromtimestamp(decoded_CWT_payload[5]).isoformat()
+        res["metadata"]["expiry"] = datetime.utcfromtimestamp(decoded_COSE_payload[4]).isoformat()
+        res["metadata"]["notBefore"] = datetime.utcfromtimestamp(decoded_COSE_payload[5]).isoformat()
         res["metadata"]["id"] = uuid
-        res["metadata"]["issuer"] = decoded_CWT_payload[1]
-        res["metadata"]["type"] = decoded_CWT_payload["vc"]["type"][1]
+        res["metadata"]["issuer"] = decoded_COSE_payload[1]
+        res["metadata"]["type"] = decoded_COSE_payload["vc"]["type"][1]
         return res
     else:
         res["verified"] = validated
@@ -308,7 +316,7 @@ def check_code(code_to_check):
         if not base32_input:
             return construct_response(False) 
 
-        padded = addBase32Padding(base32_input)
+        padded = add_base32_padding(base32_input)
 
         decoded = decode_base32(padded)
         if not decoded:
@@ -318,29 +326,29 @@ def check_code(code_to_check):
         if not decoded_COSE_structure:
             return construct_response(False) 
 
-        decoded_CWT_protected_headers = decode_cbor(decoded_COSE_structure[0])
-        if not decoded_CWT_protected_headers:
+        decoded_COSE_protected_headers = decode_cbor(decoded_COSE_structure[0])
+        if not decoded_COSE_protected_headers:
             return construct_response(False) 
 
-        decoded_CWT_payload = decode_cbor(decoded_COSE_structure[2])
-        if not decoded_CWT_payload:
+        decoded_COSE_payload = decode_cbor(decoded_COSE_structure[2])
+        if not decoded_COSE_payload:
             return construct_response(False) 
 
-        if not check_cwt_claims(decoded_CWT_payload):
+        if not check_cwt_claims(decoded_COSE_payload):
             return construct_response(False) 
 
-        decoded_UUID = decode_UUID(decoded_CWT_payload[7])
+        decoded_UUID = decode_UUID(decoded_COSE_payload[7])
         if not decoded_UUID:
             return construct_response(False)
 
-        if decoded_CWT_payload[1] in stored_dids:
-            did_json = stored_dids[decoded_CWT_payload[1]]
+        if decoded_COSE_payload[1] in stored_dids:
+            did_json = stored_dids[decoded_COSE_payload[1]]
         else:
-            did_json = get_DID_from_issuer(decoded_CWT_payload[1])
+            did_json = get_DID_from_issuer(decoded_COSE_payload[1])
             if not did_json:
                 return construct_response(False) 
 
-        if not validate_DID(decoded_CWT_payload[1], decoded_CWT_protected_headers, did_json):
+        if not validate_DID(decoded_COSE_payload[1], decoded_COSE_protected_headers, did_json):
             return construct_response(False) 
 
         signature = decoded_COSE_structure[3]
@@ -359,7 +367,7 @@ def check_code(code_to_check):
         if not validated:
             return construct_response(False) 
 
-        return construct_response(validated, decoded_CWT_payload, decoded_UUID)
+        return construct_response(validated, decoded_COSE_payload, decoded_UUID)
 
     except:
         return construct_response(False)
