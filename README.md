@@ -1,5 +1,8 @@
 # NZ COVID Pass Verifier 
-This is an API which verifies whether an NZ COVID Pass is valid or not. 
+This is an API which verifies whether an NZ COVID Pass is valid or not. There is an instance of this API running on https://api.pancake.nz/verify which can be used free of charge to validate NZ COVID Passes. If you wish to run the API yourself, you can follow the steps below.
+
+**NOTE:** The API does not store any data from NZ COVID Passes other than in short-term memory whilst checking the validity of the pass.
+
 ## Steps to run the API locally
 1. Create a new virtual environment:
 ```
@@ -17,6 +20,10 @@ pip install -r requirements.txt
 ```
 python application.py
 ```
+Or using gunicorn for production environments:
+```
+gunicorn -w 4 -b 0.0.0.0:8080 application:application
+```
 The API will now be listening for POST requests at http://localhost:5000/verify on port 5000.
 
 ## Sending an NZCP to the API for verification
@@ -27,6 +34,7 @@ The API accepts HTTP POST requests only. The only required header is `Content-Ty
 }
 ```
 The `payload` field is the NZCP to be verified.
+
 ### Successful Response
 ```json
 {
@@ -42,12 +50,13 @@ The `payload` field is the NZCP to be verified.
         "familyName": "Sparrow",
         "givenName": "Jack"
     },
-    "validated": true
+    "verified": true
 }
 ```
+
 ### Unsuccessful Response
 ```json
 {
-    "validated": false
+    "verified": false
 }
 ```

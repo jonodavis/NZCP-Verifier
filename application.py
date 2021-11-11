@@ -12,8 +12,8 @@ def verify():
     res = jsonify(verifier.check_code(req["payload"]))
     return res
   except:
-    res = jsonify({"validated": False})
-    return {"validated": False} 
+    res = jsonify({"verified": False})
+    return {"verified": False} 
 
 if __name__ == '__main__':
   application.run()

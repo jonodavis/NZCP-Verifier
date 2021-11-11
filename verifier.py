@@ -36,22 +36,37 @@ stored_dids = {}
 
 
 def addBase32Padding(base32InputNoPadding):
+    """Return a base32 string with the correct padding
+
+    Parameters:
+    base32InputNoPadding (str): base32 string without padding
+    """
     result = base32InputNoPadding 
     while ((len(result) % 8) != 0):
         result += '=' 
     return result
 
 
-def check_and_remove_prefix(padded_base32_input):
-    if (padded_base32_input[0:6] == "NZCP:/"):
+def check_and_remove_prefix(code):
+    """Returns the NZCP code without the NZCP prefix
+
+    Parameters:
+    code (str): NZCP code with prefix
+    """
+    if (code[0:6] == "NZCP:/"):
         logging.debug("Check prefix: PASS")
-        return padded_base32_input[6:]
+        return code[6:]
     else:
         logging.debug("Check prefix: FAIL")
         return False 
 
 
 def check_and_remove_version(base32_with_version):
+    """Returns the NZCP code without the NZCP version
+
+    Parameters:
+    base32_with_version (str): NZCP code with version and without prefix
+    """
     if (base32_with_version[0] == "1"):
         logging.debug("Checking version number: PASS")
         return base32_with_version[2:]
@@ -61,6 +76,11 @@ def check_and_remove_version(base32_with_version):
 
 
 def decode_base32(base32_input):
+    """Returns the decoded base32 string
+
+    Parameters:
+    base32_input (str): base32 string
+    """
     try:
         result = base64.b32decode(base32_input)
         logging.debug("Decoding Base32: PASS")
@@ -71,6 +91,11 @@ def decode_base32(base32_input):
 
 
 def decode_cbor(decoded_base32):
+    """Returns the deserialized CBOR object
+
+    Parameters:
+    decoded_base32 (bytes): decoded base32 string
+    """
     try:
         obj = loads(decoded_base32)
         logging.debug("Decoding CBOR: PASS")
@@ -81,6 +106,11 @@ def decode_cbor(decoded_base32):
 
 
 def check_cwt_claims(decoded_payload):
+    """Returns True if the CWT claims are valid
+
+    Parameters:
+    decoded_payload (dict): decoded CBOR object
+    """
     for i in [1, 4, 5, 7, 'vc']:
         if i not in decoded_payload:
             logging.debug("Checking CWT headers: FAIL")
@@ -105,6 +135,11 @@ def check_cwt_claims(decoded_payload):
     return True
 
 def decode_UUID(encoded_UUID):
+    """Returns the decoded UUID
+
+    Parameters:
+    encoded_UUID (str): encoded UUID
+    """
     try:
         result = encoded_UUID.hex()
         result = result[0:8] + "-" + result[8:12] + "-" + result[12:16] + "-" + result[16:20] + "-" + result[20:32]
@@ -117,6 +152,11 @@ def decode_UUID(encoded_UUID):
 
 
 def get_DID_from_issuer(iss):
+    """Returns the DID fetched from the issuer
+
+    Parameters:
+    iss (str): issuer
+    """
     try:
         url = iss.replace("did:web:", "https://")
         url += "/.well-known/did.json"
@@ -130,6 +170,13 @@ def get_DID_from_issuer(iss):
 
 
 def validate_DID(iss, protected_headers, did):
+    """Returns True if the DID is valid
+
+    Parameters:
+    iss (str): issuer
+    protected_headers (dict): decoded protected headers
+    did (dict): DID retrieved from the issuer
+    """
     absolute_key_reference = iss + "#" + protected_headers[4].decode()
     if absolute_key_reference not in did["assertionMethod"]:
         logging.debug("Validating DID: FAIL")
@@ -141,9 +188,14 @@ def validate_DID(iss, protected_headers, did):
     return True
 
 
-def get_issuer_public_key_from_did(did_json):
+def get_issuer_public_key_from_did(did):
+    """Returns the public key from the DID
+
+    Parameters:
+    did (dict): DID retrieved from the issuer
+    """
     try:
-        issuer_publc_key = did_json["verificationMethod"][0]["publicKeyJwk"]
+        issuer_publc_key = did["verificationMethod"][0]["publicKeyJwk"]
         logging.debug("Extracting public key from issuer DID: PASS")
         return issuer_publc_key
     except:
@@ -152,6 +204,11 @@ def get_issuer_public_key_from_did(did_json):
 
 
 def convert_jwk_to_pem(jwt_public_key):
+    """Returns the public key in PEM format
+
+    Parameters:
+    jwt_public_key (dict): public key in JWK format
+    """
     json_jwt = json.dumps(jwt_public_key) 
     key = jwk.JWK.from_json(json_jwt)
     pem_key = key.export_to_pem()
@@ -159,6 +216,12 @@ def convert_jwk_to_pem(jwt_public_key):
 
 
 def generate_sig_structure(protected_headers, payload):
+    """Returns the encoded signature structure
+
+    Parameters:
+    protected_headers (dict): decoded protected headers
+    payload (dict): decoded payload
+    """
     try:
         sig_structure = ["Signature1"] 
         sig_structure.append(protected_headers)
@@ -172,6 +235,13 @@ def generate_sig_structure(protected_headers, payload):
 
 
 def validate_signature(signature, pem_key, message):
+    """Returns True if the signature is valid
+
+    Parameters:
+    signature (bytes): digital signature
+    pem_key (bytes): public key in PEM format
+    message (bytes): signature structure to be verified
+    """
     public_key = VerifyingKey.from_pem(pem_key, hashfunc=hashlib.sha256)
     try:
         result = public_key.verify(signature, message, hashfunc=hashlib.sha256)
@@ -183,9 +253,32 @@ def validate_signature(signature, pem_key, message):
 
 
 def construct_response(validated, decoded_CWT_payload=None, uuid=None):
+    """Returns the correctly formatted response to be sent to the client
+
+    Parameters:
+    validated (bool): True if the NZCP is valid
+    decoded_CWT_payload (dict): decoded CWT payload (default None)
+    uuid (str): UUID (default None)
+    """
+    # EXAMPLE VALIDATED RESPONSE
+    # {
+    #   "verified": true,
+    #   "payload": {
+    #       "givenName": "Samantha",
+    #       "familyName": "Gill",
+    #       "dob": "1984-08-07"
+    #   },
+    #   "metadata": {
+    #     "expiry": "2022-02-20T12:34:56.000Z",
+    #     "notBefore": "2020-01-20T12:34:56.000Z",
+    #     "id": "urn:uuid:850a1de1-f890-4be5-b105-d721e5f3bc98",
+    #     "issuer": "did:web:example.com",
+    #     "type": "PublicCovidPass"
+    #   }
+    # }
     res = {}
     if validated:
-        res["validated"] = validated
+        res["verified"] = validated
         res["payload"] = decoded_CWT_payload["vc"]["credentialSubject"]
         res["metadata"] = {}
         res["metadata"]["expiry"] = datetime.utcfromtimestamp(decoded_CWT_payload[4]).isoformat()
@@ -195,45 +288,43 @@ def construct_response(validated, decoded_CWT_payload=None, uuid=None):
         res["metadata"]["type"] = decoded_CWT_payload["vc"]["type"][1]
         return res
     else:
-        res["validated"] = validated
+        res["verified"] = validated
         return res
 
 
 
 def check_code(code_to_check):
+    """Checks whether NZCP is valid and returns the response to be sent to the client
+
+    Parameters:
+    code_to_check (str): NZCP to be checked
+    """
     try:
         base32_input_without_prefix = check_and_remove_prefix(code_to_check)
         if not base32_input_without_prefix:
             return construct_response(False) 
-        # logging.debug(base32_input_without_prefix)
 
         base32_input = check_and_remove_version(base32_input_without_prefix)
         if not base32_input:
             return construct_response(False) 
-        # logging.debug(base32_input)
 
         padded = addBase32Padding(base32_input)
-        # logging.debug(padded)
 
         decoded = decode_base32(padded)
         if not decoded:
             return construct_response(False) 
-        # logging.debug(decoded.hex())
 
         decoded_COSE_structure = decode_cbor(decoded).value
         if not decoded_COSE_structure:
             return construct_response(False) 
-        # logging.debug(decoded_COSE_structure)
 
         decoded_CWT_protected_headers = decode_cbor(decoded_COSE_structure[0])
         if not decoded_CWT_protected_headers:
             return construct_response(False) 
-        # logging.debug(decoded_CWT_protected_headers)
 
         decoded_CWT_payload = decode_cbor(decoded_COSE_structure[2])
         if not decoded_CWT_payload:
             return construct_response(False) 
-        # logging.debug(decoded_CWT_payload)
 
         if not check_cwt_claims(decoded_CWT_payload):
             return construct_response(False) 
@@ -248,26 +339,21 @@ def check_code(code_to_check):
             did_json = get_DID_from_issuer(decoded_CWT_payload[1])
             if not did_json:
                 return construct_response(False) 
-        # logging.debug(did_json)
 
         if not validate_DID(decoded_CWT_payload[1], decoded_CWT_protected_headers, did_json):
             return construct_response(False) 
 
         signature = decoded_COSE_structure[3]
-        # logging.debug(signature)
 
         issuer_public_key = get_issuer_public_key_from_did(did_json)
         if not issuer_public_key:
             return construct_response(False) 
-        # logging.debug(issuer_public_key)
 
         pem_key = convert_jwk_to_pem(issuer_public_key)
-        # logging.debug(pem_key)
 
         to_be_signed = generate_sig_structure(decoded_COSE_structure[0], decoded_COSE_structure[2])
         if not to_be_signed:
             return False
-        # logging.debug(to_be_signed)
 
         validated = validate_signature(signature, pem_key, to_be_signed)
         if not validated:
@@ -287,20 +373,3 @@ def main():
 
 if __name__=="__main__":
     main()
-
-# return value of check_code shoud become this:
-# {
-#   "verified": true,
-#   "payload": {
-#       "givenName": "Samantha",
-#       "familyName": "Gill",
-#       "dob": "1984-08-07"
-#   },
-#   "metadata": {
-#     "expiry": "2022-02-20T12:34:56.000Z",
-#     "notBefore": "2020-01-20T12:34:56.000Z",
-#     "id": "urn:uuid:850a1de1-f890-4be5-b105-d721e5f3bc98",
-#     "issuer": "did:web:example.com",
-#     "type": "PublicCovidPass"
-#   }
-# }
