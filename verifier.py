@@ -287,8 +287,8 @@ def construct_response(validated, decoded_COSE_payload=None, uuid=None):
     #     "type": "PublicCovidPass"
     #   }
     # }
+    res = {}
     try:
-        res = {}
         if validated:
             res["verified"] = validated
             res["payload"] = decoded_COSE_payload["vc"]["credentialSubject"]
