@@ -236,7 +236,7 @@ def generate_sig_structure(protected_headers, payload):
     try:
         sig_structure = ["Signature1"]
         sig_structure.append(protected_headers)
-        sig_structure.append(b'')
+        sig_structure.append(b'') # type: ignore
         sig_structure.append(payload)
         logging.debug("Generating Sig_structure: PASS")
         return dumps(sig_structure)
@@ -333,7 +333,7 @@ def check_code(code_to_check):
         if not decoded:
             return construct_response(False)
 
-        decoded_COSE_structure = decode_cbor(decoded).value
+        decoded_COSE_structure = decode_cbor(decoded).value # type: ignore
         if not decoded_COSE_structure:
             return construct_response(False)
 
