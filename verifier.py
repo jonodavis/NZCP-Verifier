@@ -2,8 +2,8 @@ import base64
 import hashlib
 import json
 import logging
+import urllib.request
 from datetime import datetime
-import requests
 from cbor2 import dumps, loads
 from jwcrypto import jwk
 from ecdsa import VerifyingKey 
@@ -162,7 +162,8 @@ def get_DID_from_issuer(iss):
     try:
         url = iss.replace("did:web:", "https://")
         url += "/.well-known/did.json"
-        did_json = requests.get(url).json()
+        response = urllib.request.urlopen(url)
+        did_json = json.loads(response.read())
         stored_dids[iss] = did_json
         logging.debug("Getting DID from issuer: PASS")
         return did_json
