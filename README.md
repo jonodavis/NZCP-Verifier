@@ -59,6 +59,7 @@ The `payload` field is the NZCP to be verified.
 ### Unsuccessful Response
 ```json
 {
-    "verified": false
+    "verified": false,
+    "error": "Reason for error"
 }
 ```
