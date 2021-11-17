@@ -109,26 +109,49 @@ def check_cwt_claims(decoded_payload):
             if i not in decoded_payload:
                 logging.debug("Checking CWT headers: FAIL")
                 return False
-
         if decoded_payload[1] not in TRUSTED_ISSUERS:
             logging.debug("Checking CWT headers: FAIL")
             return False
-
         logging.debug("Checking CWT headers: PASS")
+        return True
+    except:
+        logging.debug("Checking CWT headers: FAIL")
+        return False
 
-        if datetime.now() < datetime.utcfromtimestamp(decoded_payload[5]):
-            logging.debug("Checking not before date: FAIL")
-            return False
-        logging.debug("Checking not before date: PASS")
 
+def check_exp_date(decoded_payload):
+    """
+    Returns True if the expiry date is in the future
+
+    Parameters:
+    decoded_payload (dict): decoded CBOR object
+    """
+    try:
         if datetime.now() > datetime.utcfromtimestamp(decoded_payload[4]):
             logging.debug("Checking expiry date: FAIL")
             return False
         logging.debug("Checking expiry date: PASS")
-
         return True
     except:
-        logging.debug("Checking CWT headers: FAIL")
+        logging.debug("Checking expiry date: FAIL")
+        return False
+
+
+def check_nbf_date(decoded_payload):
+    """
+    Returns True if the not before date is in the past
+
+    Parameters:
+    decoded_payload (dict): decoded CBOR object
+    """
+    try:
+        if datetime.now() < datetime.utcfromtimestamp(decoded_payload[5]):
+            logging.debug("Checking not before date: FAIL")
+            return False
+        logging.debug("Checking not before date: PASS")
+        return True
+    except:
+        logging.debug("Checking not before date: FAIL")
         return False
 
 
@@ -264,7 +287,7 @@ def validate_signature(signature, pem_key, message):
         return False
 
 
-def construct_response(validated, decoded_COSE_payload=None, uuid=None):
+def construct_response(validated, decoded_COSE_payload=None, uuid=None, error=None):
     """Returns the correctly formatted response to be sent to the client
 
     Parameters:
@@ -305,11 +328,16 @@ def construct_response(validated, decoded_COSE_payload=None, uuid=None):
             return res
         else:
             res["verified"] = validated
+            if error:
+                res["error"] = error
+            else:
+                res["error"] = "Unknown error"
             logging.debug("Constructing response: PASS")
             return res
     except:
         logging.debug("Constructing response: FAIL")
         res["verified"] = False
+        res["error"] = "Unknown error"
         return res
 
 
@@ -322,63 +350,69 @@ def check_code(code_to_check):
     try:
         base32_input_without_prefix = check_and_remove_prefix(code_to_check)
         if not base32_input_without_prefix:
-            return construct_response(False)
+            return construct_response(False, error="Error checking NZCP prefix")
 
         base32_input = check_and_remove_version(base32_input_without_prefix)
         if not base32_input:
-            return construct_response(False)
+            return construct_response(False, error="Error checking NZCP version number")
 
         padded = add_base32_padding(base32_input)
 
         decoded = decode_base32(padded)
         if not decoded:
-            return construct_response(False)
+            return construct_response(False, error="Error decoding base32")
 
         decoded_COSE_structure = decode_cbor(decoded).value # type: ignore
         if not decoded_COSE_structure:
-            return construct_response(False)
+            return construct_response(False, error="Error decoding CBOR")
 
         decoded_COSE_protected_headers = decode_cbor(decoded_COSE_structure[0])
         if not decoded_COSE_protected_headers:
-            return construct_response(False)
+            return construct_response(False, error="Error decoding CBOR")
 
         decoded_COSE_payload = decode_cbor(decoded_COSE_structure[2])
         if not decoded_COSE_payload:
-            return construct_response(False)
+            return construct_response(False, error="Error decoding CBOR")
 
         if not check_cwt_claims(decoded_COSE_payload):
-            return construct_response(False)
+            return construct_response(False, error="Error checking CWT claims")
+
+        if not check_exp_date(decoded_COSE_payload):
+            return construct_response(False, error="Expiry date is in the past")
+
+        if not check_nbf_date(decoded_COSE_payload):
+            return construct_response(False, error="Not before date is in the future")
 
         decoded_UUID = decode_UUID(decoded_COSE_payload[7])
         if not decoded_UUID:
-            return construct_response(False)
+            return construct_response(False, error="Error decoding UUID")
 
         if decoded_COSE_payload[1] in stored_dids:
             did_json = stored_dids[decoded_COSE_payload[1]]
         else:
             did_json = get_DID_from_issuer(decoded_COSE_payload[1])
             if not did_json:
-                return construct_response(False)
+                return construct_response(False, error="Error retrieving DID from issuer")
 
         if not validate_DID(decoded_COSE_payload[1], decoded_COSE_protected_headers, did_json):
-            return construct_response(False)
+            return construct_response(False, error="Error validating DID")
 
         signature = decoded_COSE_structure[3]
 
         issuer_public_key = get_issuer_public_key_from_did(did_json)
         if not issuer_public_key:
-            return construct_response(False)
+            return construct_response(False, error="Error extracting public key from issuer DID")
 
         pem_key = convert_jwk_to_pem(issuer_public_key)
 
         to_be_signed = generate_sig_structure(
             decoded_COSE_structure[0], decoded_COSE_structure[2])
         if not to_be_signed:
-            return False
+            return construct_response(False, error="Error generating Sig_structure") 
 
         validated = validate_signature(signature, pem_key, to_be_signed)
         if not validated:
-            return construct_response(False)
+            return construct_response(False, error="Error validating digital signature")
 
         return construct_response(validated, decoded_COSE_payload, decoded_UUID)
 

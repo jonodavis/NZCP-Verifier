@@ -137,11 +137,11 @@ class TestVerifierFunctions(unittest.TestCase):
 
         exp_date_in_past = self.valid_cbor_payload.copy()
         exp_date_in_past[4] = 1605171212
-        self.assertFalse(verifier.check_cwt_claims(exp_date_in_past))
+        self.assertFalse(verifier.check_exp_date(exp_date_in_past))
 
         nbf_date_in_future = self.valid_cbor_payload.copy()
         nbf_date_in_future[5] = 7979590593
-        self.assertFalse(verifier.check_cwt_claims(nbf_date_in_future))
+        self.assertFalse(verifier.check_nbf_date(nbf_date_in_future))
 
         self.assertFalse(verifier.check_cwt_claims({}))
 
@@ -211,8 +211,8 @@ class TestVerifierFunctions(unittest.TestCase):
                                                      self.valid_cbor_payload, 
                                                      self.valid_success_uuid), 
                          self.valid_success_response)
-        self.assertEqual(verifier.construct_response(False), {"verified": False})
-        self.assertEqual(verifier.construct_response(True), {"verified": False})
+        self.assertEqual(verifier.construct_response(False), {"verified": False, "error": "Unknown error"})
+        self.assertEqual(verifier.construct_response(True), {"verified": False, "error": "Unknown error"})
 
 
 class TestVerifier(unittest.TestCase):
@@ -242,19 +242,25 @@ class TestVerifier(unittest.TestCase):
             },
             "verified": True
         } 
-        self.fail_response = {"verified": False}
+        self.fail_response = {"verified": False, "error": "Unknown error"}
+        self.fail_response_bad_sig = {"verified": False, "error": "Error validating digital signature"}
+        self.fail_response_bad_did = {"verified": False, "error": "Error validating DID"}
+        self.fail_response_bad_cwt = {"verified": False, "error": "Error checking CWT claims"}
+        self.fail_response_bad_exp = {"verified": False, "error": "Expiry date is in the past"}
+        self.fail_response_bad_nbf = {"verified": False, "error": "Not before date is in the future"}
+        self.fail_response_bad_prefix = {"verified": False, "error": "Error checking NZCP prefix"}
 
     def test_check_code(self):
         self.assertEqual(verifier.check_code(self.test_codes["VALID_CODE"]), self.success_response)
-        self.assertEqual(verifier.check_code(self.test_codes["BAD_PUBLIC_KEY"]), self.fail_response)
-        self.assertEqual(verifier.check_code(self.test_codes["PUBLIC_KEY_NOT_FOUND"]), self.fail_response)
-        self.assertEqual(verifier.check_code(self.test_codes["MODIFIED_SIGNATURE"]), self.fail_response)
-        self.assertEqual(verifier.check_code(self.test_codes["MODIFIED_PAYLOAD"]), self.fail_response)
-        self.assertEqual(verifier.check_code(self.test_codes["EXPIRED_PASS"]), self.fail_response)
-        self.assertEqual(verifier.check_code(self.test_codes["NOT_ACTIVE_PASS"]), self.fail_response)
+        self.assertEqual(verifier.check_code(self.test_codes["BAD_PUBLIC_KEY"]), self.fail_response_bad_sig)
+        self.assertEqual(verifier.check_code(self.test_codes["PUBLIC_KEY_NOT_FOUND"]), self.fail_response_bad_did)
+        self.assertEqual(verifier.check_code(self.test_codes["MODIFIED_SIGNATURE"]), self.fail_response_bad_sig)
+        self.assertEqual(verifier.check_code(self.test_codes["MODIFIED_PAYLOAD"]), self.fail_response_bad_sig)
+        self.assertEqual(verifier.check_code(self.test_codes["EXPIRED_PASS"]), self.fail_response_bad_exp)
+        self.assertEqual(verifier.check_code(self.test_codes["NOT_ACTIVE_PASS"]), self.fail_response_bad_nbf)
         self.assertEqual(verifier.check_code("NZCP:/1/MEMES"), self.fail_response)
-        self.assertEqual(verifier.check_code("NOT EVEN CLOSE TO A CORRECT PASS"), self.fail_response)
-        self.assertEqual(verifier.check_code(""), self.fail_response)
+        self.assertEqual(verifier.check_code("NOT EVEN CLOSE TO A CORRECT PASS"), self.fail_response_bad_prefix)
+        self.assertEqual(verifier.check_code(""), self.fail_response_bad_prefix)
 
 
 if __name__ == '__main__':
