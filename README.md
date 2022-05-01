@@ -1,7 +1,7 @@
 # NZ COVID Pass Verifier 
 [![Python Tests](https://github.com/jonodavis/NZCP-Verifier/actions/workflows/python-tests.yml/badge.svg)](https://github.com/jonodavis/NZCP-Verifier/actions/workflows/python-tests.yml)
 
-This is an API which verifies whether an NZ COVID Pass is valid or not. There is an instance of this API running on https://api.pancake.nz/verify which can be used free of charge to validate NZ COVID Passes. If you wish to run the API yourself, you can follow the steps below.
+This is an API which verifies whether an NZ COVID Pass is valid or not. ~~There is an instance of this API running on https://api.pancake.nz/verify which can be used free of charge to validate NZ COVID Passes~~ As of the 1st of May 2022 this API is no longer active. If you wish to run the API yourself, you can follow the steps below.
 
 **NOTE:** The API does not store any data from NZ COVID Passes other than in short-term memory whilst checking the validity of the pass.
 
